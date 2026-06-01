@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Photocollage — Photo to Video Maker</title>
+  <style>
+    :root {
+      --bg: #0d0d18;
+      --surface: #13131f;
+      --surface2: #1a1a2e;
+      --surface3: #21213a;
+      --accent: #8b7cf8;
+      --accent2: #e879f9;
+      --accent-glow: rgba(139,124,248,0.25);
+      --text: #eeeef5;
+      --text-muted: #7777aa;
+      --border: rgba(255,255,255,0.07);
+      --danger: #f87171;
+      --r: 14px;
+      --rsm: 8px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 70% 50% at 10% 10%, rgba(90,50,200,0.14) 0%, transparent 65%),
+        radial-gradient(ellipse 60% 60% at 90% 90%, rgba(200,50,180,0.09) 0%, transparent 65%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    #workCanvas { display: none; }
+
+    .app {
+      position: relative;
+      z-index: 1;
+      max-width: 940px;
+      margin: 0 auto;
+      padding: 20px 20px 80px;
+    }
+
+    /* Header */
+    .header { text-align: center; padding: 48px 0 52px; }
+
+    .header-logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .header-icon {
+      width: 52px; height: 52px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px;
+      box-shadow: 0 0 36px var(--accent-glow);
+    }
+
+    .header h1 {
+      font-size: 34px;
+      font-weight: 700;
+      letter-spacing: -0.6px;
+      background: linear-gradient(130deg, var(--accent) 0%, var(--accent2) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .header-sub { color: var(--text-muted); font-size: 16px; }
+
+    /* Section */
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 28px;
+      margin-bottom: 16px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+
+    .step-badge {
+      width: 30px; height: 30px; min-width: 30px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; color: #fff;
+      margin-top: 3px;
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+
+    .section-title { font-size: 17px; font-weight: 600; margin-bottom: 2px; }
+    .section-hint  { color: var(--text-muted); font-size: 13px; }
+    .section-meta  { margin-left: auto; color: var(--text-muted); font-size: 13px; white-space: nowrap; padding-top: 4px; }
+
+    /* Upload Zone */
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--r);
+      padding: 36px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      background: var(--surface2);
+    }
+
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(139,124,248,0.07);
+    }
+
+    .upload-zone-icon { font-size: 38px; margin-bottom: 10px; }
+    .upload-zone-text { font-size: 15px; font-weight: 500; margin-bottom: 4px; }
+    .upload-zone-hint { font-size: 13px; color: var(--text-muted); }
+
+    /* Photo Grid */
+    .photo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .photo-item {
+      position: relative;
+      aspect-ratio: 1;
+      border-radius: var(--rsm);
+      overflow: hidden;
+      background: var(--surface3);
+      cursor: grab;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .photo-item:hover    { transform: scale(1.03); box-shadow: 0 4px 20px rgba(0,0,0,0.45); }
+    .photo-item.dragging { opacity: 0.45; cursor: grabbing; }
+    .photo-item.drag-over { box-shadow: 0 0 0 2px var(--accent); transform: scale(1.03); }
+
+    .photo-item img {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+      user-select: none; pointer-events: none;
+    }
+
+    .photo-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom,
+        rgba(0,0,0,0.55) 0%, transparent 38%,
+        transparent 62%, rgba(0,0,0,0.55) 100%);
+      opacity: 0;
+      transition: opacity 0.18s;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: 7px;
+    }
+
+    .photo-item:hover .photo-overlay { opacity: 1; }
+
+    .photo-num {
+      width: 20px; height: 20px;
+      background: rgba(0,0,0,0.7);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 700;
+    }
+
+    .photo-delete {
+      width: 20px; height: 20px;
+      background: rgba(248,113,113,0.9);
+      border: none; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; font-size: 11px; color: #fff; font-weight: 900;
+      transition: background 0.15s;
+    }
+
+    .photo-delete:hover { background: #ef4444; }
+
+    /* ── Mood Panel ── */
+    .mood-panel {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      overflow: hidden;
+      margin-bottom: 16px;
+      animation: fadeSlide 0.3s ease;
+    }
+
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .mood-banner {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .mood-emoji { font-size: 28px; flex-shrink: 0; }
+
+    .mood-name {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .mood-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .mood-pixabay-link {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--accent);
+      text-decoration: none;
+      white-space: nowrap;
+      padding: 6px 14px;
+      border: 1px solid rgba(139,124,248,0.3);
+      border-radius: 50px;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .mood-pixabay-link:hover {
+      background: rgba(139,124,248,0.1);
+      border-color: var(--accent);
+    }
+
+    .track-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0;
+    }
+
+    .track-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 20px;
+      border-right: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+
+    .track-card:last-child { border-right: none; }
+    .track-card:hover { background: rgba(255,255,255,0.03); }
+
+    .track-icon {
+      width: 36px; height: 36px;
+      background: var(--surface3);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .track-info { flex: 1; min-width: 0; }
+
+    .track-name {
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .track-artist { font-size: 11px; color: var(--text-muted); }
+
+    .track-search-link {
+      font-size: 11px;
+      color: var(--accent);
+      text-decoration: none;
+      white-space: nowrap;
+      padding: 4px 10px;
+      border: 1px solid rgba(139,124,248,0.25);
+      border-radius: 50px;
+      transition: background 0.15s;
+      flex-shrink: 0;
+    }
+
+    .track-search-link:hover { background: rgba(139,124,248,0.1); }
+
+    /* URL loader */
+    .url-loader {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .url-input {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--rsm);
+      color: var(--text);
+      padding: 10px 14px;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.15s;
+      min-width: 0;
+    }
+
+    .url-input::placeholder { color: var(--text-muted); }
+    .url-input:focus { border-color: var(--accent); }
+
+    .url-load-btn {
+      background: var(--surface3);
+      border: 1px solid var(--border);
+      border-radius: var(--rsm);
+      color: var(--text);
+      padding: 10px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .url-load-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .url-status {
+      font-size: 12px;
+      margin-bottom: 12px;
+      padding: 8px 12px;
+      border-radius: var(--rsm);
+      display: none;
+    }
+
+    .url-status.loading { display: block; color: var(--text-muted); background: var(--surface3); }
+    .url-status.error   { display: block; color: var(--danger); background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.2); }
+    .url-status.ok      { display: block; color: #4ade80; background: rgba(74,222,128,0.08); border: 1px solid rgba(74,222,128,0.2); }
+
+    .url-divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .url-divider::before, .url-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* Music Zone */
+    .music-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--r);
+      padding: 18px 22px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      background: var(--surface2);
+      display: flex; align-items: center; gap: 14px;
+    }
+
+    .music-zone:hover, .music-zone.has-music {
+      border-color: var(--accent);
+      background: rgba(139,124,248,0.06);
+    }
+
+    .music-icon { font-size: 26px; flex-shrink: 0; }
+    .music-text { font-size: 15px; font-weight: 500; }
+    .music-hint { font-size: 12px; color: var(--text-muted); }
+
+    .music-clear {
+      margin-left: auto;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-muted);
+      padding: 4px 12px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: border-color 0.15s, color 0.15s;
+      flex-shrink: 0;
+    }
+
+    .music-clear:hover { border-color: var(--danger); color: var(--danger); }
+
+    /* Settings */
+    .settings-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 22px;
+    }
+
+    .setting label {
+      display: block;
+      font-size: 11px; font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      text-transform: uppercase; letter-spacing: 0.08em;
+    }
+
+    .setting select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--rsm);
+      color: var(--text);
+      padding: 10px 38px 10px 14px;
+      font-size: 14px;
+      cursor: pointer; outline: none;
+      appearance: none; -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7'%3E%3Cpath fill='%237777aa' d='M5 7L0 0h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      transition: border-color 0.15s;
+    }
+
+    .setting select:hover, .setting select:focus { border-color: var(--accent); }
+
+    .slider-row { display: flex; align-items: center; gap: 12px; }
+
+    input[type=range] {
+      flex: 1;
+      -webkit-appearance: none; appearance: none;
+      height: 4px; border-radius: 2px;
+      background: var(--surface3);
+      outline: none; cursor: pointer;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      cursor: pointer;
+      box-shadow: 0 0 8px var(--accent-glow);
+    }
+
+    .slider-val {
+      min-width: 38px; text-align: right;
+      font-size: 14px; font-weight: 600; color: var(--accent);
+    }
+
+    /* Create */
+    .create-section { text-align: center; }
+
+    .create-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none; border-radius: 50px;
+      color: #fff; font-size: 17px; font-weight: 600;
+      padding: 16px 52px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+      box-shadow: 0 4px 28px var(--accent-glow);
+    }
+
+    .create-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 40px rgba(139,124,248,0.4);
+    }
+
+    .create-btn:active:not(:disabled) { transform: translateY(0); }
+    .create-btn:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
+
+    .create-hint { margin-top: 12px; font-size: 12px; color: var(--text-muted); }
+
+    /* Progress */
+    .progress-area { margin-top: 28px; }
+
+    .progress-bar-wrap {
+      background: var(--surface3);
+      border-radius: 100px;
+      height: 8px; overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 100px;
+      width: 0%; transition: width 0.4s;
+    }
+
+    .progress-label { font-size: 13px; color: var(--text-muted); }
+
+    /* Result */
+    .result-area { margin-top: 28px; }
+
+    .result-area video {
+      width: 100%; border-radius: var(--r);
+      background: #000; display: block;
+      margin-bottom: 16px; max-height: 480px;
+    }
+
+    .result-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+    .download-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--surface2);
+      border: 1px solid var(--border); border-radius: 50px;
+      color: var(--text); font-size: 14px; font-weight: 500;
+      padding: 11px 28px; text-decoration: none;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
+    }
+
+    .download-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(139,124,248,0.08); }
+
+    .redo-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: none;
+      border: 1px solid var(--border); border-radius: 50px;
+      color: var(--text-muted); font-size: 14px; font-weight: 500;
+      padding: 11px 28px; cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    .redo-btn:hover { border-color: var(--text-muted); color: var(--text); }
+    .compat-note { margin-top: 12px; font-size: 12px; color: var(--text-muted); text-align: center; }
+  </style>
+</head>
+<body>
+
+<canvas id="workCanvas"></canvas>
+
+<div class="app">
+
+  <header class="header">
+    <div class="header-logo">
+      <div class="header-icon">🎬</div>
+      <h1>Photocollage</h1>
+    </div>
+    <p class="header-sub">Turn your photos into a beautiful video with music</p>
+  </header>
+
+  <main>
+
+    <!-- Step 1 — Photos -->
+    <section class="section">
+      <div class="section-header">
+        <div class="step-badge">1</div>
+        <div>
+          <div class="section-title">Upload Photos</div>
+          <div class="section-hint">Drag and drop to reorder. Any format works.</div>
+        </div>
+        <div class="section-meta" id="photoCount"></div>
+      </div>
+      <div class="upload-zone" id="photoUploadZone" role="button" tabindex="0" aria-label="Upload photos">
+        <div class="upload-zone-icon">📷</div>
+        <div class="upload-zone-text">Drop photos here</div>
+        <div class="upload-zone-hint">or click to browse — JPG, PNG, HEIC, WebP…</div>
+        <input type="file" id="photoInput" multiple accept="image/*" style="display:none">
+      </div>
+      <div class="photo-grid" id="photoGrid"></div>
+    </section>
+
+    <!-- Step 2 — Music -->
+    <section class="section">
+      <div class="section-header">
+        <div class="step-badge">2</div>
+        <div>
+          <div class="section-title">Add Music</div>
+          <div class="section-hint" id="musicSectionHint">Upload your own, or let us suggest based on your photos</div>
+        </div>
+      </div>
+
+      <!-- Auto mood suggestion (shown after photos uploaded) -->
+      <div id="moodPanel" style="display:none" class="mood-panel">
+        <div class="mood-banner">
+          <span class="mood-emoji" id="moodEmoji">☀️</span>
+          <div>
+            <div class="mood-name" id="moodName">Bright &amp; Happy</div>
+            <div class="mood-desc" id="moodDesc">Your photos have warm, bright tones</div>
+          </div>
+          <a id="pixabayLink" class="mood-pixabay-link" target="_blank" rel="noopener noreferrer">
+            Browse on Pixabay ↗
+          </a>
+        </div>
+        <div class="track-list" id="trackList"></div>
+      </div>
+
+      <!-- Load from URL -->
+      <div class="url-loader">
+        <input type="url" id="urlInput" class="url-input" placeholder="Paste a direct MP3 URL to auto-load…" autocomplete="off" spellcheck="false">
+        <button id="urlLoadBtn" class="url-load-btn">Load</button>
+      </div>
+      <div id="urlStatus" class="url-status"></div>
+
+      <div class="url-divider">or upload a file</div>
+
+      <!-- Upload zone -->
+      <div class="music-zone" id="musicZone" role="button" tabindex="0" aria-label="Upload music file">
+        <div class="music-icon" id="musicIcon">🎵</div>
+        <div>
+          <div class="music-text" id="musicLabel">Upload a song</div>
+          <div class="music-hint" id="musicSub">MP3, WAV, AAC, OGG…</div>
+        </div>
+        <input type="file" id="musicInput" accept="audio/*" style="display:none">
+      </div>
+    </section>
+
+    <!-- Step 3 — Settings -->
+    <section class="section">
+      <div class="section-header">
+        <div class="step-badge">3</div>
+        <div>
+          <div class="section-title">Customize</div>
+          <div class="section-hint">Adjust timing, transitions, and quality</div>
+        </div>
+      </div>
+      <div class="settings-grid">
+        <div class="setting">
+          <label for="durationSlider">Duration per photo</label>
+          <div class="slider-row">
+            <input type="range" id="durationSlider" min="1" max="10" value="3" step="0.5">
+            <span class="slider-val" id="durationValue">3s</span>
+          </div>
+        </div>
+        <div class="setting">
+          <label for="transitionSelect">Transition Effect</label>
+          <select id="transitionSelect">
+            <option value="fade">✨ Crossfade</option>
+            <option value="kenburns">🔍 Ken Burns</option>
+            <option value="slide">➡ Slide</option>
+            <option value="zoom">🔎 Zoom Burst</option>
+          </select>
+        </div>
+        <div class="setting">
+          <label for="qualitySelect">Video Quality</label>
+          <select id="qualitySelect">
+            <option value="720">HD — 1280×720</option>
+            <option value="1080">Full HD — 1920×1080</option>
+            <option value="480">SD — 854×480 (faster)</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- Step 4 — Create -->
+    <section class="section create-section">
+      <button class="create-btn" id="createBtn" disabled>
+        <span aria-hidden="true">✨</span> Create Video
+      </button>
+      <p class="create-hint" id="createHint">Add at least one photo to get started</p>
+
+      <div class="progress-area" id="progressArea" style="display:none">
+        <div class="progress-bar-wrap">
+          <div class="progress-bar" id="progressBar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+        <div class="progress-label" id="progressLabel">Preparing…</div>
+      </div>
+
+      <div class="result-area" id="resultArea" style="display:none">
+        <video id="resultVideo" controls playsinline></video>
+        <div class="result-actions">
+          <a id="downloadBtn" class="download-btn">⬇ Download Video</a>
+          <button class="redo-btn" id="redoBtn">↺ Recreate</button>
+        </div>
+        <p class="compat-note">Output is .webm — plays in Chrome, Firefox, Edge and Safari 16+. Use VLC for older devices.</p>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+
+const state = {
+  photos: [],
+  music:  null, // { file?, buffer?, name }
+  settings: { duration: 3, transition: 'fade', quality: 720 },
+};
+
+// ─── DOM ─────────────────────────────────────────────────────────────────────
+
+function el(id) { return document.getElementById(id); }
+
+const photoUploadZone  = el('photoUploadZone');
+const photoInput       = el('photoInput');
+const photoGrid        = el('photoGrid');
+const photoCount       = el('photoCount');
+const moodPanel        = el('moodPanel');
+const moodEmoji        = el('moodEmoji');
+const moodName         = el('moodName');
+const moodDesc         = el('moodDesc');
+const pixabayLink      = el('pixabayLink');
+const trackList        = el('trackList');
+const urlInput         = el('urlInput');
+const urlLoadBtn       = el('urlLoadBtn');
+const urlStatus        = el('urlStatus');
+const musicZone        = el('musicZone');
+const musicIcon        = el('musicIcon');
+const musicLabel       = el('musicLabel');
+const musicSub         = el('musicSub');
+const musicInput       = el('musicInput');
+const durationSlider   = el('durationSlider');
+const durationValue    = el('durationValue');
+const transitionSelect = el('transitionSelect');
+const qualitySelect    = el('qualitySelect');
+const createBtn        = el('createBtn');
+const createHint       = el('createHint');
+const progressArea     = el('progressArea');
+const progressBar      = el('progressBar');
+const progressLabel    = el('progressLabel');
+const resultArea       = el('resultArea');
+const resultVideo      = el('resultVideo');
+const downloadBtn      = el('downloadBtn');
+const redoBtn          = el('redoBtn');
+const workCanvas       = el('workCanvas');
+
+// ─── Mood Data ────────────────────────────────────────────────────────────────
+
+const MOODS = {
+  happy: {
+    label: 'Bright & Happy',
+    emoji: '☀️',
+    desc: 'Your photos have warm, sunny tones — perfect for uplifting music!',
+    query: 'happy upbeat',
+    tracks: [
+      { name: 'Sunny', artist: 'Bensound', search: 'sunny bensound' },
+      { name: 'Ukulele', artist: 'Bensound', search: 'ukulele bensound' },
+      { name: 'Happy Rock', artist: 'Kevin MacLeod', search: 'happy rock kevin macleod' },
+    ],
+  },
+  energetic: {
+    label: 'Colorful & Energetic',
+    emoji: '⚡',
+    desc: 'Your photos are vibrant and full of color — go for something upbeat!',
+    query: 'energetic upbeat pop',
+    tracks: [
+      { name: 'Energy', artist: 'Bensound', search: 'energy bensound' },
+      { name: 'Pop', artist: 'Bensound', search: 'pop bensound' },
+      { name: 'Upbeat Dance', artist: 'Pixabay', search: 'upbeat dance pixabay' },
+    ],
+  },
+  romantic: {
+    label: 'Warm & Romantic',
+    emoji: '🌅',
+    desc: 'Your photos have a golden, warm glow — beautiful for romantic music.',
+    query: 'romantic love soft',
+    tracks: [
+      { name: 'Romance', artist: 'Bensound', search: 'romance bensound' },
+      { name: 'Canon in D', artist: 'Pachelbel', search: 'canon in d free mp3' },
+      { name: 'Love', artist: 'Bensound', search: 'love bensound' },
+    ],
+  },
+  calm: {
+    label: 'Cool & Serene',
+    emoji: '🌊',
+    desc: 'Your photos have cool, peaceful tones — great for ambient or acoustic music.',
+    query: 'calm peaceful ambient',
+    tracks: [
+      { name: 'Acoustic Breeze', artist: 'Bensound', search: 'acoustic breeze bensound' },
+      { name: 'Gymnopedie No. 1', artist: 'Satie', search: 'gymnopedie satie free mp3' },
+      { name: 'Relaxing', artist: 'Bensound', search: 'relaxing bensound' },
+    ],
+  },
+  dramatic: {
+    label: 'Dark & Dramatic',
+    emoji: '🌙',
+    desc: 'Your photos have moody, dark tones — cinematic music will match perfectly.',
+    query: 'cinematic dramatic epic',
+    tracks: [
+      { name: 'Epic', artist: 'Bensound', search: 'epic bensound' },
+      { name: 'Inspiring', artist: 'Bensound', search: 'inspiring bensound' },
+      { name: 'Cinematic Drama', artist: 'Pixabay', search: 'cinematic dramatic pixabay' },
+    ],
+  },
+  nostalgic: {
+    label: 'Soft & Nostalgic',
+    emoji: '🌸',
+    desc: 'Your photos have a timeless, gentle quality — soft piano or acoustic fits well.',
+    query: 'nostalgic soft piano acoustic',
+    tracks: [
+      { name: 'Acoustic Breeze', artist: 'Bensound', search: 'acoustic breeze bensound' },
+      { name: 'Tender', artist: 'Bensound', search: 'tender bensound' },
+      { name: 'Soft Piano', artist: 'Pixabay', search: 'soft piano pixabay free' },
+    ],
+  },
+};
+
+// ─── Photo mood analysis ──────────────────────────────────────────────────────
+
+function analyzeMood(photos) {
+  if (photos.length === 0) return null;
+
+  const c = document.createElement('canvas');
+  c.width = 32; c.height = 32;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+
+  let sumR = 0, sumG = 0, sumB = 0, sumBright = 0, sumSat = 0, count = 0;
+
+  for (const photo of photos) {
+    ctx.drawImage(photo.img, 0, 0, 32, 32);
+    const data = ctx.getImageData(0, 0, 32, 32).data;
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      sumR += r; sumG += g; sumB += b;
+      sumBright += (r + g + b) / 3;
+      const max = Math.max(r, g, b), min = Math.min(r, g, b);
+      sumSat += max === 0 ? 0 : (max - min) / max;
+      count++;
+    }
+  }
+
+  const r = sumR / count, g = sumG / count, b = sumB / count;
+  const brightness = sumBright / count;
+  const saturation = sumSat / count;
+  const warmth = (r - b) / 255;
+
+  if (brightness > 155 && warmth > 0.05 && saturation > 0.22) return 'happy';
+  if (saturation > 0.40 && brightness > 120)                   return 'energetic';
+  if (warmth > 0.08 && brightness > 70 && brightness < 155)    return 'romantic';
+  if (warmth < -0.05 && brightness > 90)                       return 'calm';
+  if (brightness < 75)                                         return 'dramatic';
+  return 'nostalgic';
+}
+
+function updateMoodPanel() {
+  if (state.photos.length === 0) {
+    moodPanel.style.display = 'none';
+    return;
+  }
+
+  const mood = analyzeMood(state.photos);
+  const data = MOODS[mood];
+
+  moodEmoji.textContent = data.emoji;
+  moodName.textContent  = data.label;
+  moodDesc.textContent  = data.desc;
+
+  const q = encodeURIComponent(data.query);
+  pixabayLink.href = 'https://pixabay.com/music/search/' + q + '/';
+
+  // Build track cards using safe DOM
+  clearChildren(trackList);
+  data.tracks.forEach(track => {
+    const card = document.createElement('div');
+    card.className = 'track-card';
+
+    const icon = document.createElement('div');
+    icon.className = 'track-icon';
+    icon.textContent = '🎵';
+
+    const info = document.createElement('div');
+    info.className = 'track-info';
+
+    const name = document.createElement('div');
+    name.className = 'track-name';
+    name.textContent = track.name;
+
+    const artist = document.createElement('div');
+    artist.className = 'track-artist';
+    artist.textContent = track.artist;
+
+    info.append(name, artist);
+
+    const link = document.createElement('a');
+    link.className = 'track-search-link';
+    link.textContent = 'Find free ↗';
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.href = 'https://pixabay.com/music/search/' + encodeURIComponent(track.search) + '/';
+
+    card.append(icon, info, link);
+    trackList.appendChild(card);
+  });
+
+  moodPanel.style.display = 'block';
+}
+
+// ─── Photo Upload ─────────────────────────────────────────────────────────────
+
+photoUploadZone.addEventListener('click', () => photoInput.click());
+photoUploadZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') photoInput.click(); });
+
+photoUploadZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  photoUploadZone.classList.add('dragover');
+});
+
+photoUploadZone.addEventListener('dragleave', e => {
+  if (!photoUploadZone.contains(e.relatedTarget))
+    photoUploadZone.classList.remove('dragover');
+});
+
+photoUploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  photoUploadZone.classList.remove('dragover');
+  const files = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/'));
+  addPhotos(files);
+});
+
+photoInput.addEventListener('change', e => {
+  addPhotos([...e.target.files]);
+  e.target.value = '';
+});
+
+const KB_VARIANTS = [
+  { s0: 1.00, s1: 1.10, px:  0.00, py:  0.00 },
+  { s0: 1.10, s1: 1.00, px:  0.04, py:  0.00 },
+  { s0: 1.00, s1: 1.10, px:  0.00, py:  0.04 },
+  { s0: 1.08, s1: 1.00, px: -0.04, py:  0.03 },
+  { s0: 1.00, s1: 1.12, px:  0.03, py: -0.03 },
+];
+
+function loadImg(src) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => res(img);
+    img.onerror = rej;
+    img.src = src;
+  });
+}
+
+async function addPhotos(files) {
+  for (const file of files) {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await loadImg(url);
+      const kbVariant = KB_VARIANTS[state.photos.length % KB_VARIANTS.length];
+      state.photos.push({ file, url, img, kbVariant });
+    } catch {
+      URL.revokeObjectURL(url);
+    }
+  }
+  renderGrid();
+  updateMoodPanel();
+  updateUI();
+}
+
+// ─── Photo Grid ───────────────────────────────────────────────────────────────
+
+let dragSrc = null;
+
+function clearChildren(node) {
+  while (node.firstChild) node.removeChild(node.firstChild);
+}
+
+function renderGrid() {
+  clearChildren(photoGrid);
+  photoCount.textContent = state.photos.length
+    ? `${state.photos.length} photo${state.photos.length !== 1 ? 's' : ''}`
+    : '';
+
+  state.photos.forEach((photo, i) => {
+    const item = document.createElement('div');
+    item.className = 'photo-item';
+    item.draggable = true;
+
+    const img = document.createElement('img');
+    img.src = photo.url;
+    img.alt = `Photo ${i + 1}`;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'photo-overlay';
+
+    const num = document.createElement('span');
+    num.className = 'photo-num';
+    num.textContent = String(i + 1);
+
+    const del = document.createElement('button');
+    del.className = 'photo-delete';
+    del.title = 'Remove photo';
+    del.setAttribute('aria-label', `Remove photo ${i + 1}`);
+    del.textContent = '×';
+    del.addEventListener('click', e => {
+      e.stopPropagation();
+      URL.revokeObjectURL(photo.url);
+      state.photos.splice(i, 1);
+      renderGrid();
+      updateMoodPanel();
+      updateUI();
+    });
+
+    overlay.append(num, del);
+    item.append(img, overlay);
+    photoGrid.appendChild(item);
+
+    item.addEventListener('dragstart', e => {
+      dragSrc = i;
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    item.addEventListener('dragend', () => {
+      item.classList.remove('dragging');
+      photoGrid.querySelectorAll('.photo-item').forEach(el => el.classList.remove('drag-over'));
+    });
+
+    item.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      photoGrid.querySelectorAll('.photo-item').forEach(el => el.classList.remove('drag-over'));
+      item.classList.add('drag-over');
+    });
+
+    item.addEventListener('drop', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (dragSrc !== null && dragSrc !== i) {
+        const [moved] = state.photos.splice(dragSrc, 1);
+        state.photos.splice(i, 0, moved);
+        renderGrid();
+        updateMoodPanel();
+      }
+    });
+  });
+}
+
+// ─── Music: File Upload ───────────────────────────────────────────────────────
+
+musicZone.addEventListener('click', () => {
+  if (state.music) clearMusic();
+  else musicInput.click();
+});
+
+musicZone.addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); musicZone.click(); }
+});
+
+musicInput.addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  setMusicFromFile(file);
+  e.target.value = '';
+});
+
+function setMusicFromFile(file) {
+  state.music = { file, name: file.name };
+  showMusicLoaded(file.name);
+}
+
+function setMusicFromBuffer(arrayBuffer, name) {
+  state.music = { buffer: arrayBuffer, name };
+  showMusicLoaded(name);
+}
+
+function showMusicLoaded(name) {
+  musicIcon.textContent = '🎶';
+  musicLabel.textContent = name;
+  musicSub.textContent = 'Click to remove';
+  musicZone.classList.add('has-music');
+
+  if (!musicZone.querySelector('.music-clear')) {
+    const btn = document.createElement('button');
+    btn.className = 'music-clear';
+    btn.textContent = 'Remove';
+    btn.addEventListener('click', ev => { ev.stopPropagation(); clearMusic(); });
+    musicZone.appendChild(btn);
+  }
+}
+
+function clearMusic() {
+  state.music = null;
+  musicIcon.textContent = '🎵';
+  musicLabel.textContent = 'Upload a song';
+  musicSub.textContent = 'MP3, WAV, AAC, OGG…';
+  musicZone.classList.remove('has-music');
+  const btn = musicZone.querySelector('.music-clear');
+  if (btn) btn.remove();
+}
+
+// ─── Music: Load from URL ─────────────────────────────────────────────────────
+
+urlLoadBtn.addEventListener('click', loadMusicFromUrl);
+urlInput.addEventListener('keydown', e => { if (e.key === 'Enter') loadMusicFromUrl(); });
+
+function setUrlStatus(type, text) {
+  urlStatus.className = 'url-status ' + type;
+  urlStatus.textContent = text;
+}
+
+async function loadMusicFromUrl() {
+  const raw = urlInput.value.trim();
+  if (!raw) return;
+
+  // Basic URL validation — only allow http/https
+  let url;
+  try {
+    url = new URL(raw);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('bad protocol');
+  } catch {
+    setUrlStatus('error', 'Please enter a valid http:// or https:// URL.');
+    return;
+  }
+
+  setUrlStatus('loading', 'Fetching audio…');
+  urlLoadBtn.disabled = true;
+
+  try {
+    const response = await fetch(url.href, { mode: 'cors' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const buffer = await response.arrayBuffer();
+
+    // Quick check: must be reasonably sized (> 10 KB)
+    if (buffer.byteLength < 10_000) throw new Error('File too small — might not be audio.');
+
+    const fileName = url.pathname.split('/').pop() || 'track.mp3';
+    setMusicFromBuffer(buffer, decodeURIComponent(fileName));
+    setUrlStatus('ok', `Loaded: ${decodeURIComponent(fileName)}`);
+    urlInput.value = '';
+  } catch (err) {
+    if (err instanceof TypeError && err.message.includes('fetch')) {
+      setUrlStatus('error', 'CORS blocked — the server does not allow direct loading. Download the MP3 and upload it using the button below.');
+    } else {
+      setUrlStatus('error', `Could not load: ${err.message}. Try downloading the file and uploading it instead.`);
+    }
+  } finally {
+    urlLoadBtn.disabled = false;
+  }
+}
+
+// ─── Settings ─────────────────────────────────────────────────────────────────
+
+durationSlider.addEventListener('input', e => {
+  state.settings.duration = parseFloat(e.target.value);
+  durationValue.textContent = `${state.settings.duration}s`;
+  updateUI();
+});
+
+transitionSelect.addEventListener('change', e => { state.settings.transition = e.target.value; });
+qualitySelect.addEventListener('change',    e => { state.settings.quality    = parseInt(e.target.value); });
+
+function updateUI() {
+  const n = state.photos.length;
+  createBtn.disabled = n < 1;
+  if (n === 0) {
+    createHint.textContent = 'Add at least one photo to get started';
+  } else {
+    const { duration } = state.settings;
+    const td = Math.min(0.8, duration * 0.3);
+    const total = (n * duration + (n - 1) * td).toFixed(1);
+    createHint.textContent = `${n} photo${n !== 1 ? 's' : ''} · ~${total}s video`;
+  }
+}
+
+redoBtn.addEventListener('click', () => {
+  resultArea.style.display = 'none';
+  updateUI();
+});
+
+// ─── Easing ───────────────────────────────────────────────────────────────────
+
+function easeInOut(t) {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
+// ─── Drawing ──────────────────────────────────────────────────────────────────
+
+function drawFill(ctx, img, alpha, W, H, scale, ox, oy) {
+  if (alpha <= 0) return;
+  const s = scale === undefined ? 1 : scale;
+  const dx = ox    === undefined ? 0 : ox;
+  const dy = oy    === undefined ? 0 : oy;
+  ctx.globalAlpha = Math.min(1, Math.max(0, alpha));
+  const fit = Math.max(W / img.width, H / img.height) * s;
+  const w = img.width * fit;
+  const h = img.height * fit;
+  ctx.drawImage(img, (W - w) / 2 + dx * W, (H - h) / 2 + dy * H, w, h);
+  ctx.globalAlpha = 1;
+}
+
+function kbParams(photo, t) {
+  const v = photo.kbVariant;
+  const p = easeInOut(t);
+  return { scale: v.s0 + (v.s1 - v.s0) * p, ox: v.px * p, oy: v.py * p };
+}
+
+function drawDisplay(ctx, photo, phaseT, W, H, transition) {
+  if (transition === 'kenburns' || transition === 'fade') {
+    const { scale, ox, oy } = kbParams(photo, phaseT);
+    drawFill(ctx, photo.img, 1, W, H, scale, ox, oy);
+  } else {
+    drawFill(ctx, photo.img, 1, W, H);
+  }
+}
+
+function drawTransitionFrame(ctx, from, to, phaseT, W, H, transition) {
+  const p = easeInOut(phaseT);
+  if (transition === 'fade') {
+    drawFill(ctx, from.img, 1 - p, W, H);
+    drawFill(ctx, to.img,   p,     W, H);
+  } else if (transition === 'kenburns') {
+    const { scale: s1, ox: ox1, oy: oy1 } = kbParams(from, 1);
+    const { scale: s2, ox: ox2, oy: oy2 } = kbParams(to, 0);
+    drawFill(ctx, from.img, 1 - p, W, H, s1, ox1, oy1);
+    drawFill(ctx, to.img,   p,     W, H, s2, ox2, oy2);
+  } else if (transition === 'slide') {
+    const offset = Math.round(p * W);
+    ctx.save(); ctx.translate(-offset, 0);
+    drawFill(ctx, from.img, 1, W, H);
+    ctx.restore();
+    ctx.save(); ctx.translate(W - offset, 0);
+    drawFill(ctx, to.img, 1, W, H);
+    ctx.restore();
+  } else if (transition === 'zoom') {
+    drawFill(ctx, from.img, 1 - p, W, H, 1 + p * 0.15);
+    drawFill(ctx, to.img,   p,     W, H, 1.15 - p * 0.15);
+  }
+}
+
+function drawFrame(ctx, photos, elapsed, W, H, settings) {
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+
+  const { duration, transition } = settings;
+  const td = Math.min(0.8, duration * 0.3);
+  let t = Math.max(0, elapsed);
+
+  for (let i = 0; i < photos.length; i++) {
+    if (i < photos.length - 1) {
+      if (t < duration) {
+        drawDisplay(ctx, photos[i], t / duration, W, H, transition);
+        return;
+      }
+      t -= duration;
+      if (t < td) {
+        drawTransitionFrame(ctx, photos[i], photos[i + 1], t / td, W, H, transition);
+        return;
+      }
+      t -= td;
+    } else {
+      drawDisplay(ctx, photos[i], Math.min(t / duration, 1), W, H, transition);
+      return;
+    }
+  }
+}
+
+// ─── Video Creation ───────────────────────────────────────────────────────────
+
+createBtn.addEventListener('click', createVideo);
+
+async function getAudioArrayBuffer() {
+  const { music } = state;
+  if (!music) return null;
+  if (music.buffer) return music.buffer;
+  if (music.file) return music.file.arrayBuffer();
+  return null;
+}
+
+async function createVideo() {
+  if (typeof MediaRecorder === 'undefined') {
+    alert('Sorry — your browser does not support MediaRecorder. Please use Chrome, Firefox, or Edge.');
+    return;
+  }
+
+  const { photos, settings } = state;
+  const { duration, transition, quality } = settings;
+  const td = Math.min(0.8, duration * 0.3);
+  const totalDur = photos.length * duration + (photos.length - 1) * td;
+
+  const W = quality === 480 ? 854  : quality === 1080 ? 1920 : 1280;
+  const H = quality;
+
+  workCanvas.width  = W;
+  workCanvas.height = H;
+  const ctx = workCanvas.getContext('2d');
+
+  createBtn.disabled         = true;
+  progressArea.style.display = 'block';
+  resultArea.style.display   = 'none';
+  progressBar.style.width    = '0%';
+  progressLabel.textContent  = 'Setting up…';
+
+  // Audio
+  let audioCtx   = null;
+  let audioTrack = null;
+  let audioSrc   = null;
+
+  const rawAudio = await getAudioArrayBuffer();
+  if (rawAudio) {
+    try {
+      audioCtx = new AudioContext();
+      const buf = await audioCtx.decodeAudioData(rawAudio.slice(0)); // slice to copy — avoid detach issues
+      const dest = audioCtx.createMediaStreamDestination();
+      audioSrc = audioCtx.createBufferSource();
+      audioSrc.buffer = buf;
+      audioSrc.connect(dest);
+      audioTrack = dest.stream.getAudioTracks()[0];
+    } catch (err) {
+      console.warn('Audio decode failed:', err);
+      audioCtx = null; audioTrack = null; audioSrc = null;
+    }
+  }
+
+  // Recorder
+  const canvasStream = workCanvas.captureStream(30);
+  const tracks = [...canvasStream.getVideoTracks()];
+  if (audioTrack) tracks.push(audioTrack);
+  const stream = new MediaStream(tracks);
+
+  const MIMES = [
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm',
+  ];
+  const mimeType = MIMES.find(m => MediaRecorder.isTypeSupported(m)) || 'video/webm';
+  const bps = quality === 1080 ? 8_000_000 : quality === 720 ? 4_000_000 : 2_000_000;
+
+  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: bps });
+  const chunks = [];
+  recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+  const whenDone = new Promise(res => {
+    recorder.onstop = () => res(new Blob(chunks, { type: mimeType }));
+  });
+
+  if (audioSrc) audioSrc.start(0);
+  recorder.start(200);
+
+  let t0 = null;
+
+  await new Promise(resolve => {
+    function frame(ts) {
+      if (t0 === null) t0 = ts;
+      const elapsed = (ts - t0) / 1000;
+
+      if (elapsed >= totalDur) {
+        drawFrame(ctx, photos, totalDur - 0.001, W, H, settings);
+        progressBar.style.width = '100%';
+        progressBar.setAttribute('aria-valuenow', '100');
+        progressLabel.textContent = 'Finalizing video…';
+        resolve();
+        return;
+      }
+
+      drawFrame(ctx, photos, elapsed, W, H, settings);
+
+      const pct = Math.min(100, Math.round((elapsed / totalDur) * 100));
+      progressBar.style.width = `${pct}%`;
+      progressBar.setAttribute('aria-valuenow', String(pct));
+      const left = Math.ceil(totalDur - elapsed);
+      progressLabel.textContent = `Creating video… ${pct}%  (${left}s remaining)`;
+
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  });
+
+  recorder.stop();
+  if (audioSrc)  { try { audioSrc.stop(); }  catch (_) {} }
+  if (audioCtx)  { try { audioCtx.close(); } catch (_) {} }
+
+  const blob = await whenDone;
+  const videoUrl = URL.createObjectURL(blob);
+
+  resultVideo.src = videoUrl;
+  const date = new Date().toISOString().split('T')[0];
+  downloadBtn.href = videoUrl;
+  downloadBtn.setAttribute('download', `photocollage-${date}.webm`);
+
+  progressArea.style.display = 'none';
+  resultArea.style.display   = 'block';
+  updateUI();
+
+  resultArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+</script>
+</body>
+</html>
