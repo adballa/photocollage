@@ -634,7 +634,7 @@
       </div>
 
       <!-- Mood panel — main Pixabay connection, shown after photos uploaded -->
-      <div id="moodPanel" style="display:none" class="mood-panel">
+      <div id="moodPanel" class="mood-panel">
         <div class="mood-banner">
           <span class="mood-emoji" id="moodEmoji">☀️</span>
           <div>
@@ -785,6 +785,22 @@ const workCanvas       = el('workCanvas');
 
 // ─── Mood Data ────────────────────────────────────────────────────────────────
 
+// Shown before any photos are uploaded
+const DEFAULT_MOOD = {
+  label: 'Popular Free Tracks',
+  emoji: '🎵',
+  desc: 'Upload your photos above — we\'ll pick the best match for your mood automatically',
+  query: 'best free background music',
+  tracks: [
+    { name: 'Sunny',          artist: 'Bensound',       search: 'sunny bensound' },
+    { name: 'Acoustic Breeze',artist: 'Bensound',       search: 'acoustic breeze bensound' },
+    { name: 'Canon in D',     artist: 'Pachelbel',      search: 'canon in d free mp3' },
+    { name: 'Epic',           artist: 'Bensound',       search: 'epic bensound' },
+    { name: 'Gymnopedie No.1',artist: 'Satie',          search: 'gymnopedie satie free mp3' },
+    { name: 'Ukulele',        artist: 'Bensound',       search: 'ukulele bensound' },
+  ],
+};
+
 const MOODS = {
   happy: {
     label: 'Bright & Happy',
@@ -892,13 +908,9 @@ function analyzeMood(photos) {
 }
 
 function updateMoodPanel() {
-  if (state.photos.length === 0) {
-    moodPanel.style.display = 'none';
-    return;
-  }
-
-  const mood = analyzeMood(state.photos);
-  const data = MOODS[mood];
+  const data = state.photos.length === 0
+    ? DEFAULT_MOOD
+    : MOODS[analyzeMood(state.photos)];
 
   moodEmoji.textContent = data.emoji;
   moodName.textContent  = data.label;
@@ -1224,6 +1236,9 @@ redoBtn.addEventListener('click', () => {
   resultArea.style.display = 'none';
   updateUI();
 });
+
+// Show default music suggestions immediately on load
+updateMoodPanel();
 
 // ─── Easing ───────────────────────────────────────────────────────────────────
 
