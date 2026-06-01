@@ -605,7 +605,7 @@
 
       <!-- Load from URL -->
       <div class="url-loader">
-        <input type="url" id="urlInput" class="url-input" placeholder="Paste a direct MP3 URL to auto-load…" autocomplete="off" spellcheck="false">
+        <input type="url" id="urlInput" class="url-input" placeholder="Paste MP3 URL — e.g. from Pixabay: right-click Download → Copy link address" autocomplete="off" spellcheck="false">
         <button id="urlLoadBtn" class="url-load-btn">Load</button>
       </div>
       <div id="urlStatus" class="url-status"></div>
@@ -1096,11 +1096,32 @@ function setUrlStatus(type, text) {
   urlStatus.textContent = text;
 }
 
+// Fetch audio bytes — tries direct first, then a CORS proxy automatically.
+async function fetchAudioBuffer(href, onStatus) {
+  // 1. Direct fetch (works when server allows CORS, e.g. some CDNs)
+  onStatus('loading', 'Fetching audio…');
+  try {
+    const r = await fetch(href, { mode: 'cors', signal: AbortSignal.timeout(10_000) });
+    if (r.ok) {
+      const buf = await r.arrayBuffer();
+      if (buf.byteLength > 10_000) return buf;
+    }
+  } catch (_) { /* fall through to proxy */ }
+
+  // 2. CORS proxy fallback — routes request through corsproxy.io
+  onStatus('loading', 'Direct load blocked — retrying via proxy…');
+  const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(href);
+  const r = await fetch(proxyUrl, { signal: AbortSignal.timeout(20_000) });
+  if (!r.ok) throw new Error(`HTTP ${r.status} from proxy`);
+  const buf = await r.arrayBuffer();
+  if (buf.byteLength < 10_000) throw new Error('Response too small — may not be audio.');
+  return buf;
+}
+
 async function loadMusicFromUrl() {
   const raw = urlInput.value.trim();
   if (!raw) return;
 
-  // Basic URL validation — only allow http/https
   let url;
   try {
     url = new URL(raw);
@@ -1110,27 +1131,16 @@ async function loadMusicFromUrl() {
     return;
   }
 
-  setUrlStatus('loading', 'Fetching audio…');
   urlLoadBtn.disabled = true;
 
   try {
-    const response = await fetch(url.href, { mode: 'cors' });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const buffer = await response.arrayBuffer();
-
-    // Quick check: must be reasonably sized (> 10 KB)
-    if (buffer.byteLength < 10_000) throw new Error('File too small — might not be audio.');
-
-    const fileName = url.pathname.split('/').pop() || 'track.mp3';
-    setMusicFromBuffer(buffer, decodeURIComponent(fileName));
-    setUrlStatus('ok', `Loaded: ${decodeURIComponent(fileName)}`);
+    const buffer = await fetchAudioBuffer(url.href, setUrlStatus);
+    const fileName = decodeURIComponent(url.pathname.split('/').pop() || 'track.mp3');
+    setMusicFromBuffer(buffer, fileName);
+    setUrlStatus('ok', 'Loaded: ' + fileName);
     urlInput.value = '';
   } catch (err) {
-    if (err instanceof TypeError && err.message.includes('fetch')) {
-      setUrlStatus('error', 'CORS blocked — the server does not allow direct loading. Download the MP3 and upload it using the button below.');
-    } else {
-      setUrlStatus('error', `Could not load: ${err.message}. Try downloading the file and uploading it instead.`);
-    }
+    setUrlStatus('error', 'Could not load audio. ' + err.message + ' — try downloading the file and uploading it below.');
   } finally {
     urlLoadBtn.disabled = false;
   }
