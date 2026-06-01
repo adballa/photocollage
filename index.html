@@ -661,16 +661,14 @@
         <input type="file" id="musicInput" accept="audio/*" style="display:none">
       </div>
 
-      <!-- URL loader — secondary option -->
-      <details class="url-section">
-        <summary class="url-toggle">Or paste a direct MP3 URL</summary>
-        <div class="url-loader">
-          <input type="url" id="urlInput" class="url-input" placeholder="https://cdn.pixabay.com/audio/…mp3" autocomplete="off" spellcheck="false">
-          <button id="urlLoadBtn" class="url-load-btn">Load</button>
-        </div>
-        <div id="urlStatus" class="url-status"></div>
-        <p class="url-tip">On Pixabay: right-click the Download button → Copy link address, then paste here</p>
-      </details>
+      <!-- URL loader — always visible -->
+      <div class="url-divider">or paste a direct MP3 URL</div>
+      <div class="url-loader">
+        <input type="url" id="urlInput" class="url-input" placeholder="https://cdn.pixabay.com/audio/…mp3" autocomplete="off" spellcheck="false">
+        <button id="urlLoadBtn" class="url-load-btn">Load</button>
+      </div>
+      <div id="urlStatus" class="url-status"></div>
+      <p class="url-tip">Tip: on Pixabay right-click the Download button → Copy link address, then paste above</p>
     </section>
 
     <!-- Step 3 — Settings -->
