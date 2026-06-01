@@ -407,6 +407,51 @@
 
     .music-clear:hover { border-color: var(--danger); color: var(--danger); }
 
+    /* Mood footer */
+    .mood-footer {
+      padding: 10px 20px;
+      font-size: 12px;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+      background: rgba(139,124,248,0.04);
+    }
+
+    /* URL section — collapsible secondary option */
+    .url-section {
+      margin-top: 12px;
+    }
+
+    .url-toggle {
+      font-size: 12px;
+      color: var(--text-muted);
+      cursor: pointer;
+      list-style: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 0;
+      user-select: none;
+      transition: color 0.15s;
+    }
+
+    .url-toggle::-webkit-details-marker { display: none; }
+    .url-toggle::before { content: '▸'; font-size: 10px; transition: transform 0.2s; }
+    details[open] .url-toggle::before { transform: rotate(90deg); }
+    .url-toggle:hover { color: var(--accent); }
+
+    .url-section .url-loader {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .url-tip {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 8px;
+      opacity: 0.7;
+    }
+
     /* Settings */
     .settings-grid {
       display: grid;
@@ -584,11 +629,11 @@
         <div class="step-badge">2</div>
         <div>
           <div class="section-title">Add Music</div>
-          <div class="section-hint" id="musicSectionHint">Upload your own, or let us suggest based on your photos</div>
+          <div class="section-hint">Upload photos first — we'll suggest tracks based on the mood of your pics</div>
         </div>
       </div>
 
-      <!-- Auto mood suggestion (shown after photos uploaded) -->
+      <!-- Mood panel — main Pixabay connection, shown after photos uploaded -->
       <div id="moodPanel" style="display:none" class="mood-panel">
         <div class="mood-banner">
           <span class="mood-emoji" id="moodEmoji">☀️</span>
@@ -597,22 +642,16 @@
             <div class="mood-desc" id="moodDesc">Your photos have warm, bright tones</div>
           </div>
           <a id="pixabayLink" class="mood-pixabay-link" target="_blank" rel="noopener noreferrer">
-            Browse on Pixabay ↗
+            Browse all on Pixabay ↗
           </a>
         </div>
         <div class="track-list" id="trackList"></div>
+        <div class="mood-footer">
+          Click "Find free ↗" to open Pixabay, download the track, then upload it below
+        </div>
       </div>
 
-      <!-- Load from URL -->
-      <div class="url-loader">
-        <input type="url" id="urlInput" class="url-input" placeholder="Paste MP3 URL — e.g. from Pixabay: right-click Download → Copy link address" autocomplete="off" spellcheck="false">
-        <button id="urlLoadBtn" class="url-load-btn">Load</button>
-      </div>
-      <div id="urlStatus" class="url-status"></div>
-
-      <div class="url-divider">or upload a file</div>
-
-      <!-- Upload zone -->
+      <!-- Upload zone — primary action after picking a track -->
       <div class="music-zone" id="musicZone" role="button" tabindex="0" aria-label="Upload music file">
         <div class="music-icon" id="musicIcon">🎵</div>
         <div>
@@ -621,6 +660,17 @@
         </div>
         <input type="file" id="musicInput" accept="audio/*" style="display:none">
       </div>
+
+      <!-- URL loader — secondary option -->
+      <details class="url-section">
+        <summary class="url-toggle">Or paste a direct MP3 URL</summary>
+        <div class="url-loader">
+          <input type="url" id="urlInput" class="url-input" placeholder="https://cdn.pixabay.com/audio/…mp3" autocomplete="off" spellcheck="false">
+          <button id="urlLoadBtn" class="url-load-btn">Load</button>
+        </div>
+        <div id="urlStatus" class="url-status"></div>
+        <p class="url-tip">On Pixabay: right-click the Download button → Copy link address, then paste here</p>
+      </details>
     </section>
 
     <!-- Step 3 — Settings -->
