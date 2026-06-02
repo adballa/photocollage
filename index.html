@@ -4,6 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Photocollage — Photo to Video Maker</title>
+
+  <!-- PostHog Analytics — replace YOUR_POSTHOG_KEY with your real key from app.posthog.com -->
+  <script>
+    !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+" (stub)"},o="capture identify alias people.set people.set_once set_config register register_once unregister opt_out_capturing has_opted_out_capturing opt_in_capturing reset isFeatureEnabled onFeatureFlags getFeatureFlag getFeatureFlagPayload reloadFeatureFlags group updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures getActiveMatchingSurveys getSurveys onSessionId".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+    posthog.init('YOUR_POSTHOG_KEY', {
+      api_host: 'https://us.i.posthog.com',
+      person_profiles: 'identified_only',
+      capture_pageview: true,         // auto-tracks page views
+      capture_pageleave: true,        // tracks when users leave
+      autocapture: false,             // we track manually for precision
+    });
+  </script>
+
   <style>
     :root {
       --bg: #0b0b15;
@@ -612,6 +625,12 @@
 </footer>
 
 <script>
+// ─── Analytics ───────────────────────────────────────────────────────────────
+
+function track(event, props) {
+  if (window.posthog) posthog.capture(event, props || {});
+}
+
 // ─── State ───────────────────────────────────────────────────────────────────
 
 const state = {
@@ -847,6 +866,7 @@ async function addPhotos(files) {
     } catch { URL.revokeObjectURL(url); }
   }
   renderGrid(); updateMoodPanel(); updateUI();
+  track('photos_uploaded', { total_photos: state.photos.length, added: files.length });
 }
 
 // ─── Photo Grid ───────────────────────────────────────────────────────────────
@@ -887,6 +907,7 @@ function renderGrid() {
       URL.revokeObjectURL(photo.url);
       state.photos.splice(i, 1);
       renderGrid(); updateMoodPanel(); updateUI();
+      track('photo_removed', { remaining: state.photos.length });
     });
 
     overlay.append(num, del);
@@ -929,9 +950,16 @@ function renderGrid() {
 
 // ─── Notes ────────────────────────────────────────────────────────────────────
 
+let noteTrackTimer = null;
 globalNoteInput.addEventListener('input', e => {
   state.settings.globalNote = e.target.value;
   noteCharCount.textContent = e.target.value.length + ' / 80';
+  // Debounce so we track once per typing session, not every keystroke
+  clearTimeout(noteTrackTimer);
+  noteTrackTimer = setTimeout(() => {
+    if (e.target.value.length > 0)
+      track('slide_note_added', { length: e.target.value.length });
+  }, 1500);
 });
 
 document.querySelectorAll('.pos-btn').forEach(btn => {
@@ -939,6 +967,7 @@ document.querySelectorAll('.pos-btn').forEach(btn => {
     document.querySelectorAll('.pos-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     state.settings.notePosition = btn.dataset.pos;
+    track('note_position_changed', { position: btn.dataset.pos });
   });
 });
 
@@ -948,8 +977,16 @@ musicZone.addEventListener('click', () => { if (state.music) clearMusic(); else 
 musicZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); musicZone.click(); } });
 musicInput.addEventListener('change', e => { const f = e.target.files[0]; if (!f) return; setMusicFromFile(f); e.target.value = ''; });
 
-function setMusicFromFile(file) { state.music = { file, name: file.name }; showMusicLoaded(file.name); }
-function setMusicFromBuffer(buf, name) { state.music = { buffer: buf, name }; showMusicLoaded(name); }
+function setMusicFromFile(file) {
+  state.music = { file, name: file.name };
+  showMusicLoaded(file.name);
+  track('music_added', { method: 'file_upload', name: file.name });
+}
+function setMusicFromBuffer(buf, name) {
+  state.music = { buffer: buf, name };
+  showMusicLoaded(name);
+  track('music_added', { method: 'url_load', name });
+}
 
 function showMusicLoaded(name) {
   musicIcon.textContent = '🎶'; musicLabel.textContent = name;
@@ -1011,8 +1048,10 @@ async function loadMusicFromUrl() {
   } catch (err) {
     if (err.message === 'BLOCKED') {
       setUrlStatus('error', 'This site blocks direct loading. Download the MP3 first, then upload it using the button above.');
+      track('music_url_failed', { reason: 'cors_blocked', url: url.hostname });
     } else {
       setUrlStatus('error', 'Could not load — ' + err.message);
+      track('music_url_failed', { reason: err.message, url: url.hostname });
     }
   } finally { urlLoadBtn.disabled = false; }
 }
@@ -1026,7 +1065,10 @@ durationSlider.addEventListener('input', e => {
 });
 transitionSelect.addEventListener('change', e => { state.settings.transition = e.target.value; });
 qualitySelect.addEventListener('change',    e => { state.settings.quality = parseInt(e.target.value); });
-enhanceToggle.addEventListener('change',    e => { state.settings.enhance = e.target.checked; });
+enhanceToggle.addEventListener('change', e => {
+  state.settings.enhance = e.target.checked;
+  track('enhance_toggled', { enabled: e.target.checked });
+});
 
 function updateUI() {
   const n = state.photos.length;
@@ -1041,6 +1083,10 @@ function updateUI() {
 }
 
 redoBtn.addEventListener('click', () => { resultArea.style.display = 'none'; updateUI(); });
+
+downloadBtn.addEventListener('click', () => {
+  track('video_downloaded', { photo_count: state.photos.length });
+});
 
 // Initialise
 updateMoodPanel();
@@ -1298,6 +1344,19 @@ async function createVideo() {
   resultArea.style.display = 'block';
   updateUI();
   resultArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  track('video_created', {
+    photo_count:      photos.length,
+    transition:       settings.transition,
+    quality:          settings.quality,
+    duration_per_photo: settings.duration,
+    has_music:        !!state.music,
+    has_global_note:  !!settings.globalNote,
+    has_captions:     photos.some(p => p.caption),
+    enhance_on:       settings.enhance,
+    note_position:    settings.notePosition,
+    video_length_sec: Math.round(totalDur),
+  });
 }
 </script>
 </body>
